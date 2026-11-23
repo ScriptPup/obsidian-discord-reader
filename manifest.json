@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-discord-reader",
+	"name": "Discord Reader",
 	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
+	"minAppVersion": "1.13.0",
+	"description": "Sets up a discord 'bot' which will copy messages into your specified obsidian directory.",
+	"author": "ScriptPup",
+	"authorUrl": "https://github.com/ScriptPup",
 	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+	"isDesktopOnly": true
 }
