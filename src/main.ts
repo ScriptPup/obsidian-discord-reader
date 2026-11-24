@@ -5,30 +5,99 @@ import {
 	Modal,
 	Notice,
 	Plugin,
+	addIcon,
+	setIcon,
+	setTooltip
 } from 'obsidian';
 import {	
 	DEFAULT_SETTINGS,
+	REQUIRED_SETTINGS,
 	DiscordReaderSettings,
 	DiscordReaderSettingsTab,
+	DiscordReaderRequiredSettings,
 } from './settings';
+import { discordIcon } from './icons';
+import { DiscordReaderBot } from "./discord";
+import { startServer } from './proxy/server';
+import { type Server } from "http";
 
-// Remember to rename these classes and interfaces!
-
-export default class DiscordReader extends Plugin {
+export default class DiscordReader extends Plugin {	
+	private discord?: DiscordReaderBot;
 	settings!: DiscordReaderSettings;
+	validationStatus: boolean = false;
+	proxyServer?: Server;
+
+	private getDiscordTokenSecret(): string | null {
+		const secret = this.app.secretStorage.getSecret(this.settings.token);		
+		return secret
+	}
+
+	private validateSettings(token: string | null) {
+		this.validationStatus = true;
+		for (let requiredSetting of Object.keys(REQUIRED_SETTINGS)) {
+			const _reqSettingRequired: boolean = REQUIRED_SETTINGS[requiredSetting as keyof DiscordReaderRequiredSettings];
+			if (_reqSettingRequired) {
+				const _settingValue = this.settings[requiredSetting as keyof DiscordReaderSettings]
+				if (!_settingValue || _settingValue == "") {
+					if (requiredSetting == "token") {
+						if (!token || token == "") {
+							console.error(`Unable to connect to discord, ${requiredSetting} not configured.`);
+							this.validationStatus = false;
+						}
+						continue;
+					}
+					console.error(`Unable to connect to discord, ${requiredSetting} not configured.`);
+					this.validationStatus = false;
+				}
+				
+			}
+			if (!this.validationStatus) return;
+		}
+		return;
+	}
+
+	private async connectDiscord(): Promise<boolean> {
+		// Don't try to re-connect if already connected.
+		new Notice(`Attempting to connect discord`);
+		if (this.discord) return false;
+		
+		// If the token (or any other required configuration) isn't set, don't try and connect to discord
+		const token = this.getDiscordTokenSecret();
+		this.validateSettings(token);
+		if (!this.validationStatus){ return false; }
+		this.discord = new DiscordReaderBot(
+			token!,
+			this.settings.guild,
+			this.settings.channelid
+		)
+		try {
+			await this.discord.login();
+		} catch (err) {
+			delete this.discord;
+			new Notice(`Connecting to discord server failed. Please verify your settings, technical error details are available in the developer console.`);
+			console.error(`Failed to connect to discord.`, err);
+			return false;
+		}
+
+		return true;
+		
+	}
 
 	async onload() {
-		await this.loadSettings();
+		// console.log('Loading discord reader app!');		
+		await this.loadSettings();		
+		this.proxyServer = await startServer();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
+		
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
+		addIcon('discord', discordIcon);
 		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+		statusBarItemEl.addClass('discord', 'disconnected');		
+		setIcon(statusBarItemEl, 'discord');
+		setTooltip(statusBarItemEl, "Discord is not connected.");		
+		const connectionStatus = await this.connectDiscord();
+		if(connectionStatus) statusBarItemEl.removeClass('disconnected');
 
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
@@ -58,7 +127,7 @@ export default class DiscordReader extends Plugin {
 				const markdownView =
 					this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
+					// If checking is true, proxyServerwe're simply "checking" if the command can be run.
 					// If checking is false, then we want to actually perform the operation.
 					if (!checking) {
 						new DiscordReaderModal(this.app).open();
@@ -73,20 +142,11 @@ export default class DiscordReader extends Plugin {
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new DiscordReaderSettingsTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		// this.registerInterval(
-		// 	window.setInterval(() => console.log('setInterval changed'), 5 * 60 * 1000),
-		// );
 	}
 
-	onunload() {}
+	onunload() {
+		this.proxyServer?.close();
+	}
 
 	async loadSettings() {
 		this.settings = Object.assign(
