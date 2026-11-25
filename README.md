@@ -1,3 +1,7 @@
+# TODO:
+Refactor. Don't use discordjs. Try this out as a reference/starting point and try again.
+https://github.com/bicybert/discord-to-obsidian/blob/main/src/discord.ts
+
 # Obsidian Sample Plugin
 
 This is a sample plugin for Obsidian (https://obsidian.md).

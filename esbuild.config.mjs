@@ -57,7 +57,13 @@ const context = await esbuild.context({
 		"node:tls",
 		"node:url",
 		"node:child_process",
-		"express"
+		"node:http2",
+		"node:https",
+		"node:crypto",
+		"express",
+		"global-agent",
+		"http-proxy-middleware",
+		"undici"
 	],
 	format: 'cjs',
 	target: 'es2021',

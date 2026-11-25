@@ -19,7 +19,7 @@ export const startServer = async (): Promise<Server> => {
         // mount `exampleProxy` in web server
         app.use('/api', exampleProxy);
         const server = app.listen(3000,
-            () => { res(server) }
+            () => { res(server); console.log("Proxy server started."); }
         );
     });   
 }
