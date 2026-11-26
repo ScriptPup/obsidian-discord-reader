@@ -18,14 +18,11 @@ import {
 } from './settings';
 import { discordIcon } from './icons';
 import { DiscordReaderBot } from "./discord";
-import { startServer } from './proxy/server';
-import { type Server } from "http";
 
 export default class DiscordReader extends Plugin {	
 	private discord?: DiscordReaderBot;
 	settings!: DiscordReaderSettings;
 	validationStatus: boolean = false;
-	proxyServer?: Server;
 
 	private getDiscordTokenSecret(): string | null {
 		const secret = this.app.secretStorage.getSecret(this.settings.token);		
@@ -85,10 +82,7 @@ export default class DiscordReader extends Plugin {
 
 	async onload() {
 		// console.log('Loading discord reader app!');		
-		await this.loadSettings();		
-		this.proxyServer = await startServer();
-
-		
+		await this.loadSettings();	
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		addIcon('discord', discordIcon);
@@ -145,7 +139,7 @@ export default class DiscordReader extends Plugin {
 	}
 
 	onunload() {
-		this.proxyServer?.close();
+		
 	}
 
 	async loadSettings() {

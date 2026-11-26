@@ -13,8 +13,7 @@
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
 		"allowSyntheticDefaultImports": true,
-		"lib": ["ES2021", "DOM"],
-		"ignoreDeprecations": "6.0"
+		"lib": ["ES2021", "DOM"]
 	},
 	"include": ["src/**/*.ts","src/**/*.svg"]
 }
