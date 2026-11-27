@@ -1,13 +1,12 @@
 import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
 	Modal,
 	Notice,
 	Plugin,
 	addIcon,
 	setIcon,
-	setTooltip
+	setTooltip,
+	ButtonComponent,
+	Menu
 } from 'obsidian';
 import {	
 	DEFAULT_SETTINGS,
@@ -23,6 +22,20 @@ export default class DiscordReader extends Plugin {
 	private discord?: DiscordReaderBot;
 	settings!: DiscordReaderSettings;
 	validationStatus: boolean = false;
+	discordStatusEl?: HTMLElement;
+
+	private discordStatusMenu () {
+		const myMenu = new Menu();
+		myMenu.addItem((item) =>
+			item
+			.setTitle("Reconnect")
+			.setIcon("refresh")
+			.onClick(() => {
+				this.connectDiscord();
+			})
+		);
+		return myMenu;
+	}
 
 	private getDiscordTokenSecret(): string | null {
 		const secret = this.app.secretStorage.getSecret(this.settings.token);		
@@ -53,10 +66,25 @@ export default class DiscordReader extends Plugin {
 		return;
 	}
 
-	private async connectDiscord(): Promise<boolean> {
+	private disconnectDiscordStatus() {
+		this.discordStatusEl?.removeClass("connected");
+		this.discordStatusEl?.addClass("disconnected");
+		if(this.discordStatusEl) setTooltip(this.discordStatusEl, "Discord is not connected.");
+	}
+
+	private connectDiscordStatus() {
+		this.discordStatusEl?.removeClass("disconnected");
+		this.discordStatusEl?.addClass("connected");
+		if(this.discordStatusEl) setTooltip(this.discordStatusEl, "Discord is connected.");
+	}
+
+	public async connectDiscord(): Promise<boolean> {
 		// Don't try to re-connect if already connected.
 		new Notice(`Attempting to connect discord`);
-		if (this.discord) return false;
+		if (this.discord) {
+			this.connectDiscordStatus();
+			return true;
+		}
 		
 		// If the token (or any other required configuration) isn't set, don't try and connect to discord
 		const token = this.getDiscordTokenSecret();
@@ -68,14 +96,15 @@ export default class DiscordReader extends Plugin {
 			this.settings.channelid
 		)
 		try {
-			await this.discord.login();
+			if(!await this.discord.login()){
+				throw Error("Login failed.");
+			}
 		} catch (err) {
 			delete this.discord;
-			new Notice(`Connecting to discord server failed. Please verify your settings, technical error details are available in the developer console.`);
-			console.error(`Failed to connect to discord.`, err);
+			this.disconnectDiscordStatus();
 			return false;
 		}
-
+		this.connectDiscordStatus();
 		return true;
 		
 	}
@@ -83,56 +112,62 @@ export default class DiscordReader extends Plugin {
 	async onload() {
 		// console.log('Loading discord reader app!');		
 		await this.loadSettings();	
+		const statusMenu = this.discordStatusMenu();
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
+		// This adds a statustatusMenus bar item to the bottom of the app. Does not work on mobile apps.
 		addIcon('discord', discordIcon);
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.addClass('discord', 'disconnected');		
-		setIcon(statusBarItemEl, 'discord');
-		setTooltip(statusBarItemEl, "Discord is not connected.");		
+		this.discordStatusEl = this.addStatusBarItem();
+		this.discordStatusEl.addClass('discord', 'disconnected');
+		this.discordStatusEl.onClickEvent((evt: MouseEvent)=>{
+			statusMenu.showAtMouseEvent(evt);
+		});	
+		setIcon(this.discordStatusEl, 'discord');
+			
 		const connectionStatus = await this.connectDiscord();
-		if(connectionStatus) statusBarItemEl.removeClass('disconnected');
+		if(connectionStatus) this.discordStatusEl.removeClass('disconnected');
 
 		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new DiscordReaderModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, proxyServerwe're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new DiscordReaderModal(this.app).open();
-					}
+		// this.addCommand({
+		// 	id: 'open-modal-simple',
+		// 	name: 'Open modal (simple)',
+		// 	callback: () => {
+		// 		new DiscordReaderModal(this).open();
+		// 	},
+		// });
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			},
-		});
+		// This adds an editor command that can perform some operation on the current editor instance
+		// this.addCommand({
+		// 	id: 'replace-selected',
+		// 	name: 'Replace selected content',
+		// 	editorCallback: (
+		// 		editor: Editor,
+		// 		_ctx: MarkdownView | MarkdownFileInfo,
+		// 	) => {
+		// 		editor.replaceSelection('Sample editor command');
+		// 	},
+		// });
+
+		// This adds a complex command that can check whether the current state of the app allows execution of the command
+		// this.addCommand({
+		// 	id: 'open-modal-complex',
+		// 	name: 'Open modal (complex)',
+		// 	checkCallback: (checking: boolean) => {
+		// 		// Conditions to check
+		// 		const markdownView =
+		// 			this.app.workspace.getActiveViewOfType(MarkdownView);
+		// 		if (markdownView) {
+		// 			// If checking is true, proxyServerwe're simply "checking" if the command can be run.
+		// 			// If checking is false, then we want to actually perform the operation.
+		// 			if (!checking) {
+		// 				new DiscordReaderModal(this).open();
+		// 			}
+
+		// 			// This command will only show up in Command Palette when the check function returns true
+		// 			return true;
+		// 		}
+		// 		return false;
+		// 	},
+		// });
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new DiscordReaderSettingsTab(this.app, this));
@@ -156,9 +191,18 @@ export default class DiscordReader extends Plugin {
 }
 
 class DiscordReaderModal extends Modal {
+	private discordReader: DiscordReader;
+	constructor(discordReader: DiscordReader){		
+		super(discordReader.app);
+		this.discordReader = discordReader;
+	}
 	onOpen() {
 		const { contentEl } = this;
-		contentEl.setText('Woah!');
+		const button = new ButtonComponent(contentEl);
+		button.setButtonText("Reconnect");
+		button.onClick(()=>{
+			this.discordReader.connectDiscord();
+		});
 	}
 
 	onClose() {
@@ -166,3 +210,4 @@ class DiscordReaderModal extends Modal {
 		contentEl.empty();
 	}
 }
+
